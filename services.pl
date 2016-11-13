@@ -29,6 +29,8 @@ $val = encode_json( { data => \@nodes } );
 `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_nodes' -o '$val'`;
 $val = encode_json( { data => \@services } );
 `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services' -o '$val'`;
+$val = encode_json( { data => \@checks } );
+`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_checks' -o '$val'`;
 
 my ( $fh, $filename ) = tempfile();
 binmode $fh, ':utf8';
