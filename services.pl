@@ -12,6 +12,8 @@ use File::Temp qw(tempfile);
 my $ua = LWP::UserAgent->new( timeout => 10 );
 my $item_key = $ENV{SRV_ITEM_KEY};
 
+my %CHECK_MAP = ( passing => 0, warning => 1, critical => 2 );
+
 my @dcs;
 my @nodes;
 my @services;
@@ -124,8 +126,10 @@ sub _checks {
         '{#CHECK_NAME}' => $check->{Name},
       };
       push @checks, $item;
+
+      my $st = $CHECK_MAP{ $check->{Status} };
       push @items_data,
-          "- ${item_key}_check_status[$dc,$node->{Node},$service->{ID},$check->{CheckID}] $check->{Status}\n";
+          "- ${item_key}_check_status[$dc,$node->{Node},$service->{ID},$check->{CheckID}] $st\n";
     }
   }
 
