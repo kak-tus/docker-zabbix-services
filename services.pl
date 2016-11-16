@@ -90,6 +90,8 @@ sub _services {
   my $data = _query("/v1/catalog/node/$node->{Node}?dc=$dc");
 
   foreach my $service ( values %{ $data->{Services} } ) {
+    $service->{ID} = _service_prettify( $service->{ID} );
+
     my $item = {
       '{#DC}'         => $dc,
       '{#NODE}'       => $node->{Node},
@@ -134,4 +136,12 @@ sub _checks {
   }
 
   return;
+}
+
+sub _service_prettify {
+  my $name = shift;
+  ## Cut nomad GUIDs from service name
+  ## they are changes after service restart
+  $name =~ s/-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}//g;
+  return $name;
 }
