@@ -18,10 +18,12 @@ my @dcs;
 my @nodes;
 my @services;
 my @checks;
+my @services_flow;
 
 my @items_data;
 
 my %check_exists;
+my %services_count;
 
 _dcs();
 
@@ -31,6 +33,8 @@ $val = encode_json( { data => \@nodes } );
 `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_nodes' -o '$val'`;
 $val = encode_json( { data => \@services } );
 `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services' -o '$val'`;
+$val = encode_json( { data => \@services_flow } );
+`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services_flow' -o '$val'`;
 $val = encode_json( { data => \@checks } );
 `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_checks' -o '$val'`;
 
@@ -63,6 +67,13 @@ sub _dcs {
     _nodes($dc);
   }
 
+  foreach my $key ( keys %services_count ) {
+    push @items_data,
+        "- ${item_key}_service_flow_count[$key] $services_count{$key}{count}\n";
+    push @items_data,
+        "- ${item_key}_service_flow_setuped_count[$key] $services_count{$key}{setuped_count}\n";
+  }
+
   return;
 }
 
@@ -90,16 +101,30 @@ sub _services {
   my $data = _query("/v1/catalog/node/$node->{Node}?dc=$dc");
 
   foreach my $service ( values %{ $data->{Services} } ) {
-    $service->{ID} = _service_prettify( $service->{ID} );
+    $service->{ID} = _service_prettify( $service->{ID}, $service->{Tags} );
 
-    my $item = {
-      '{#DC}'         => $dc,
-      '{#NODE}'       => $node->{Node},
-      '{#SERVICE_ID}' => $service->{ID},
-    };
-    push @services, $item;
-    push @items_data,
-        "- ${item_key}_service_status[$dc,$node->{Node},$service->{ID}] 1\n";
+    my $count = _detect_count( $service->{Tags} );
+
+    if ($count) {
+      my $item = { '{#SERVICE_ID}' => $service->{ID}, };
+
+      push @services_flow, $item;
+
+      my $key = $service->{ID};
+      $services_count{$key} //= { count => 0, setuped_count => $count };
+      $services_count{$key}{count}++;
+    }
+    else {
+      my $item = {
+        '{#DC}'         => $dc,
+        '{#NODE}'       => $node->{Node},
+        '{#SERVICE_ID}' => $service->{ID},
+      };
+
+      push @services, $item;
+      push @items_data,
+          "- ${item_key}_service_status[$dc,$node->{Node},$service->{ID}] 1\n";
+    }
 
     _checks( $dc, $node, $service );
   }
@@ -139,9 +164,30 @@ sub _checks {
 }
 
 sub _service_prettify {
-  my $name = shift;
+  my ( $name, $tags ) = @_;
+
   ## Cut nomad GUIDs from service name
   ## they are changes after service restart
   $name =~ s/-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}//g;
+
+  ## remove tags from name (nomad add them)
+  foreach my $tag (@$tags) {
+    $name =~ s/\-{0,1}$tag\-{0,1}//g;
+  }
+
+  ## remove nomad stuff
+  $name =~ s/\_nomad-executor\-//;
+
   return $name;
+}
+
+sub _detect_count {
+  my $tags = shift;
+
+  foreach my $tag (@$tags) {
+    next unless index( $tag, 'count-' ) == 0;
+    return substr( $tag, 6, length($tag) - 6 );
+  }
+
+  return;
 }
