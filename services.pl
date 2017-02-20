@@ -28,22 +28,32 @@ my %services_count;
 _dcs();
 
 my $val = encode_json( { data => \@dcs } );
-`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_dcs' -o '$val'`;
+say
+    `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_dcs' -o '$val'`;
+
 $val = encode_json( { data => \@nodes } );
-`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_nodes' -o '$val'`;
+say
+    `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_nodes' -o '$val'`;
+
 $val = encode_json( { data => \@services } );
-`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services' -o '$val'`;
+say
+    `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services' -o '$val'`;
+
 $val = encode_json( { data => \@services_flow } );
-`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services_flow' -o '$val'`;
+say
+    `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_services_flow' -o '$val'`;
+
 $val = encode_json( { data => \@checks } );
-`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_checks' -o '$val'`;
+say
+    `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -k '$ENV{SRV_DISCOVERY_KEY}_checks' -o '$val'`;
 
 my ( $fh, $filename ) = tempfile();
 binmode $fh, ':utf8';
 print $fh @items_data;
 close $fh;
 
-`zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -i $filename`;
+say
+    `zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME} -i $filename`;
 
 sub _query {
   my $addr = shift;
