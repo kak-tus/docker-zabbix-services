@@ -13,4 +13,4 @@ COPY services.pl /etc/periodic/15min/services
 RUN apk add --update-cache perl perl-json zabbix-utils perl-libwww \
   && rm -rf /var/cache/apk/*
 
-CMD crond -f
+CMD [ "crond", "-f" ]
