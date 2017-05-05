@@ -1,7 +1,11 @@
 FROM alpine:3.5
 
 RUN \
-  apk add --no-cache perl perl-json zabbix-utils perl-libwww
+  apk add --no-cache \
+    perl \
+    perl-json \
+    perl-libwww \
+    zabbix-utils
 
 ENV CONSUL_HTTP_ADDR=consul.service.consul:8500
 ENV CONSUL_TOKEN=
@@ -11,6 +15,9 @@ ENV SRV_ITEM_KEY=service_item
 ENV SRV_HOSTNAME=
 ENV SRV_ZABBIX_SERVER=
 
-COPY services.pl /etc/periodic/15min/services
+ENV SRV_CHECK_PERIOD=15
 
-CMD [ "crond", "-f" ]
+COPY services.pl /usr/local/bin/services.pl
+COPY start.sh /usr/local/bin/start.sh
+
+CMD ["/usr/local/bin/start.sh"]
