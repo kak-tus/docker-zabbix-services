@@ -61,11 +61,11 @@ sub _query {
   my $url = "http://$ENV{CONSUL_HTTP_ADDR}$addr";
 
   my $resp;
-  my $try = 3;
+  my $try = 5;
 
   while ( $try > 0 ) {
     $resp = $ua->get($url);
-    last $resp->is_success;
+    last if $resp->is_success;
 
     $try--;
     sleep 1;
@@ -169,7 +169,7 @@ sub _checks {
 
   state %cache;
 
-  my $url = "/v1/health/service/$service->{Service}?dc=$dc";
+  my $url = "/v1/health/node/$node->{Node}?dc=$dc";
 
   unless ( $cache{$url} ) {
     $cache{$url} = _query($url);
@@ -178,39 +178,37 @@ sub _checks {
   my $data = $cache{$url};
   return unless $data;
 
-  foreach my $check_item (@$data) {
-    next unless $check_item->{Node}{Node} eq $node->{Node};
+  foreach my $check (@$data) {
+    next unless $check->{ServiceID} eq $service->{ID};
 
-    foreach my $check ( @{ $check_item->{Checks} } ) {
-      my $item = {
-        '{#DC}'           => $dc,
-        '{#NODE}'         => $node->{Node},
-        '{#SERVICE_ID}'   => $service->{ID},
-        '{#SERVICE_NAME}' => $service->{Service},
-        '{#CHECK_ID}'     => $check->{CheckID},
-        '{#CHECK_NAME}'   => $check->{Name},
-      };
+    my $item = {
+      '{#DC}'           => $dc,
+      '{#NODE}'         => $node->{Node},
+      '{#SERVICE_ID}'   => $service->{ID},
+      '{#SERVICE_NAME}' => $service->{Service},
+      '{#CHECK_ID}'     => $check->{CheckID},
+      '{#CHECK_NAME}'   => $check->{Name},
+    };
 
-      my $st = $CHECK_MAP{ $check->{Status} };
-      my $key;
+    my $st = $CHECK_MAP{ $check->{Status} };
+    my $key;
 
-      if ($count) {
-        $key = "$service->{ID},$check->{CheckID}";
-        next if $check_exists{$key};
+    if ($count) {
+      $key = "$service->{ID},$check->{CheckID}";
+      next if $check_exists{$key};
 
-        push @checks_flow, $item;
-        push @items_data,  "- ${item_key}_check_status_flow[$key] $st\n";
-      }
-      else {
-        $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
-        next if $check_exists{$key};
-
-        push @checks,     $item;
-        push @items_data, "- ${item_key}_check_status[$key] $st\n";
-      }
-
-      $check_exists{$key} = 1;
+      push @checks_flow, $item;
+      push @items_data,  "- ${item_key}_check_status_flow[$key] $st\n";
     }
+    else {
+      $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
+      next if $check_exists{$key};
+
+      push @checks,     $item;
+      push @items_data, "- ${item_key}_check_status[$key] $st\n";
+    }
+
+    $check_exists{$key} = 1;
   }
 
   return;
