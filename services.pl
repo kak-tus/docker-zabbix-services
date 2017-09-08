@@ -116,8 +116,6 @@ sub _services {
   return unless $data;
 
   foreach my $service ( values %{ $data->{Services} } ) {
-    $service->{ID} = _service_prettify( $service->{ID}, $service->{Tags} );
-
     my $count = _detect_count( $service->{Tags} );
 
     if ( _is_ignore( $service->{Tags} ) ) {
@@ -126,19 +124,23 @@ sub _services {
     }
 
     if ($count) {
-      my $item = { '{#SERVICE_ID}' => $service->{ID} };
+      my $item = {
+        '{#SERVICE_ID}'      => $service->{ID},
+        '{#SERVICE_SERVICE}' => $service->{Service},
+      };
 
       push @services_flow, $item;
 
-      my $key = $service->{ID};
+      my $key = $service->{Service};
       $services_count{$key} //= { count => 0, setuped_count => $count };
       $services_count{$key}{count}++;
     }
     else {
       my $item = {
-        '{#DC}'         => $dc,
-        '{#NODE}'       => $node->{Node},
-        '{#SERVICE_ID}' => $service->{ID},
+        '{#DC}'              => $dc,
+        '{#NODE}'            => $node->{Node},
+        '{#SERVICE_ID}'      => $service->{ID},
+        '{#SERVICE_SERVICE}' => $service->{Service},
       };
 
       push @services, $item;
@@ -171,27 +173,29 @@ sub _checks {
 
     foreach my $check ( @{ $check_item->{Checks} } ) {
       my $item = {
-        '{#DC}'         => $dc,
-        '{#NODE}'       => $node->{Node},
-        '{#SERVICE_ID}' => $service->{ID},
-        '{#CHECK_ID}'   => $check->{CheckID},
-        '{#CHECK_NAME}' => $check->{Name},
+        '{#DC}'              => $dc,
+        '{#NODE}'            => $node->{Node},
+        '{#SERVICE_ID}'      => $service->{ID},
+        '{#SERVICE_SERVICE}' => $service->{Service},
+        '{#CHECK_ID}'        => $check->{CheckID},
+        '{#CHECK_NAME}'      => $check->{Name},
       };
 
       my $st = $CHECK_MAP{ $check->{Status} };
+      my $key;
 
       if ($count) {
-        my $key = "$service->{ID},$check->{CheckID}";
+        $key = "$service->{ID},$check->{CheckID}";
         next if $check_exists{$key};
 
         push @checks_flow, $item;
-        push @items_data, "- ${item_key}_check_status_flow[$key] $st\n";
+        push @items_data,  "- ${item_key}_check_status_flow[$key] $st\n";
       }
       else {
-        my $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
+        $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
         next if $check_exists{$key};
 
-        push @checks, $item;
+        push @checks,     $item;
         push @items_data, "- ${item_key}_check_status[$key] $st\n";
       }
 
@@ -200,24 +204,6 @@ sub _checks {
   }
 
   return;
-}
-
-sub _service_prettify {
-  my ( $name, $tags ) = @_;
-
-  ## Cut nomad GUIDs from service name
-  ## they are changes after service restart
-  $name =~ s/-[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}//g;
-
-  ## remove tags from name (nomad add them)
-  foreach my $tag (@$tags) {
-    $name =~ s/\-{0,1}$tag\-{0,1}//g;
-  }
-
-  ## remove nomad stuff
-  $name =~ s/\_nomad-executor\-//;
-
-  return $name;
 }
 
 sub _detect_count {
