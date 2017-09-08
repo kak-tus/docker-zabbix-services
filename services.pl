@@ -19,6 +19,7 @@ my @nodes;
 my @services;
 my @checks;
 my @services_flow;
+my @checks_flow;
 
 my @items_data;
 
@@ -43,6 +44,9 @@ say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_services_flow' -o '$val'`;
 
 $val = encode_json( { data => \@checks } );
 say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_checks' -o '$val'`;
+
+$val = encode_json( { data => \@checks_flow } );
+say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_checks_flow' -o '$val'`;
 
 my ( $fh, $filename ) = tempfile();
 binmode $fh, ':utf8';
@@ -116,6 +120,11 @@ sub _services {
 
     my $count = _detect_count( $service->{Tags} );
 
+    if ( _is_ignore( $service->{Tags} ) ) {
+      _checks( $dc, $node, $service, $count );
+      next;
+    }
+
     if ($count) {
       my $item = { '{#SERVICE_ID}' => $service->{ID} };
 
@@ -137,14 +146,14 @@ sub _services {
           "- ${item_key}_service_status[$dc,$node->{Node},$service->{ID}] 1\n";
     }
 
-    _checks( $dc, $node, $service );
+    _checks( $dc, $node, $service, $count );
   }
 
   return;
 }
 
 sub _checks {
-  my ( $dc, $node, $service ) = @_;
+  my ( $dc, $node, $service, $count ) = @_;
 
   state %cache;
 
@@ -161,10 +170,6 @@ sub _checks {
     next unless $check_item->{Node}{Node} eq $node->{Node};
 
     foreach my $check ( @{ $check_item->{Checks} } ) {
-      my $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
-      next if $check_exists{$key};
-      $check_exists{$key} = 1;
-
       my $item = {
         '{#DC}'         => $dc,
         '{#NODE}'       => $node->{Node},
@@ -172,11 +177,25 @@ sub _checks {
         '{#CHECK_ID}'   => $check->{CheckID},
         '{#CHECK_NAME}' => $check->{Name},
       };
-      push @checks, $item;
 
       my $st = $CHECK_MAP{ $check->{Status} };
-      push @items_data,
-          "- ${item_key}_check_status[$dc,$node->{Node},$service->{ID},$check->{CheckID}] $st\n";
+
+      if ($count) {
+        my $key = "$service->{ID},$check->{CheckID}";
+        next if $check_exists{$key};
+
+        push @checks_flow, $item;
+        push @items_data, "- ${item_key}_check_status_flow[$key] $st\n";
+      }
+      else {
+        my $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
+        next if $check_exists{$key};
+
+        push @checks, $item;
+        push @items_data, "- ${item_key}_check_status[$key] $st\n";
+      }
+
+      $check_exists{$key} = 1;
     }
   }
 
@@ -207,6 +226,16 @@ sub _detect_count {
   foreach my $tag (@$tags) {
     next unless index( $tag, 'count-' ) == 0;
     return substr( $tag, 6, length($tag) - 6 );
+  }
+
+  return;
+}
+
+sub _is_ignore {
+  my $tags = shift;
+
+  foreach my $tag (@$tags) {
+    return 1 if $tag eq 'ignore-service';
   }
 
   return;
