@@ -58,8 +58,18 @@ say `$zabbix -i $filename`;
 sub _query {
   my $addr = shift;
 
-  my $url  = "http://$ENV{CONSUL_HTTP_ADDR}$addr";
-  my $resp = $ua->get($url);
+  my $url = "http://$ENV{CONSUL_HTTP_ADDR}$addr";
+
+  my $resp;
+  my $try = 3;
+
+  while ( $try > 0 ) {
+    $resp = $ua->get($url);
+    last $resp->is_success;
+
+    $try--;
+    sleep 1;
+  }
 
   unless ( $resp->is_success ) {
     warn 'Consul unacessible';
