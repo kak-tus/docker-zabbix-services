@@ -125,8 +125,8 @@ sub _services {
 
     if ($count) {
       my $item = {
-        '{#SERVICE_ID}'      => $service->{ID},
-        '{#SERVICE_SERVICE}' => $service->{Service},
+        '{#SERVICE_ID}'   => $service->{ID},
+        '{#SERVICE_NAME}' => $service->{Service},
       };
 
       push @services_flow, $item;
@@ -137,10 +137,10 @@ sub _services {
     }
     else {
       my $item = {
-        '{#DC}'              => $dc,
-        '{#NODE}'            => $node->{Node},
-        '{#SERVICE_ID}'      => $service->{ID},
-        '{#SERVICE_SERVICE}' => $service->{Service},
+        '{#DC}'           => $dc,
+        '{#NODE}'         => $node->{Node},
+        '{#SERVICE_ID}'   => $service->{ID},
+        '{#SERVICE_NAME}' => $service->{Service},
       };
 
       push @services, $item;
@@ -173,12 +173,12 @@ sub _checks {
 
     foreach my $check ( @{ $check_item->{Checks} } ) {
       my $item = {
-        '{#DC}'              => $dc,
-        '{#NODE}'            => $node->{Node},
-        '{#SERVICE_ID}'      => $service->{ID},
-        '{#SERVICE_SERVICE}' => $service->{Service},
-        '{#CHECK_ID}'        => $check->{CheckID},
-        '{#CHECK_NAME}'      => $check->{Name},
+        '{#DC}'           => $dc,
+        '{#NODE}'         => $node->{Node},
+        '{#SERVICE_ID}'   => $service->{ID},
+        '{#SERVICE_NAME}' => $service->{Service},
+        '{#CHECK_ID}'     => $check->{CheckID},
+        '{#CHECK_NAME}'   => $check->{Name},
       };
 
       my $st = $CHECK_MAP{ $check->{Status} };
