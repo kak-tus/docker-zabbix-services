@@ -175,7 +175,7 @@ sub _checks {
 
   state %cache;
 
-  my $url = "/v1/health/node/$node->{Node}?dc=$dc";
+  my $url = "/v1/health/service/$service->{Service}?dc=$dc";
 
   unless ( $cache{$url} ) {
     $cache{$url} = _query($url);
@@ -184,50 +184,53 @@ sub _checks {
   my $data = $cache{$url};
   return unless $data;
 
-  foreach my $check (@$data) {
-    next unless $check->{ServiceID} eq $service->{ID};
+  foreach my $check_item (@$data) {
+    next unless $check_item->{Node}{Node} eq $node->{Node};
 
-    my $item = {
-      '{#DC}'           => $dc,
-      '{#NODE}'         => $node->{Node},
-      '{#SERVICE_ID}'   => $service->{ID},
-      '{#SERVICE_NAME}' => $service->{Service},
-      '{#CHECK_ID}'     => $check->{CheckID},
-      '{#CHECK_NAME}'   => $check->{Name},
-    };
+    foreach my $check ( @{ $check_item->{Checks} } ) {
 
-    my $st = $CHECK_MAP{ $check->{Status} };
-    my $key;
+      my $item = {
+        '{#DC}'           => $dc,
+        '{#NODE}'         => $node->{Node},
+        '{#SERVICE_ID}'   => $service->{ID},
+        '{#SERVICE_NAME}' => $service->{Service},
+        '{#CHECK_ID}'     => $check->{CheckID},
+        '{#CHECK_NAME}'   => $check->{Name},
+      };
 
-    if ($count) {
-      $key = $service->{Service};
+      my $st = $CHECK_MAP{ $check->{Status} };
+      my $key;
 
-      unless ( $check_exists{$key} ) {
-        push @checks_flow, $item;
+      if ($count) {
+        $key = $service->{Service};
+
+        unless ( $check_exists{$key} ) {
+          push @checks_flow, $item;
+        }
+
+        unless ( defined $final_status_checks_flow{$key} ) {
+          $final_status_checks_flow{$key} = $st;
+        }
+
+        ## If found passing
+        if ( $st == 0 ) {
+          $final_status_checks_flow{$key} = $st;
+        }
+        ## If found critical
+        elsif ( $final_status_checks_flow{$key} < $st ) {
+          $final_status_checks_flow{$key} = $st;
+        }
+      }
+      else {
+        $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
+        next if $check_exists{$key};
+
+        push @checks,     $item;
+        push @items_data, "- ${item_key}_check_status[$key] $st\n";
       }
 
-      unless ( defined $final_status_checks_flow{$key} ) {
-        $final_status_checks_flow{$key} = $st;
-      }
-
-      ## If found passing
-      if ( $st == 0 ) {
-        $final_status_checks_flow{$key} = $st;
-      }
-      ## If found critical
-      elsif ( $final_status_checks_flow{$key} < $st ) {
-        $final_status_checks_flow{$key} = $st;
-      }
+      $check_exists{$key} = 1;
     }
-    else {
-      $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
-      next if $check_exists{$key};
-
-      push @checks,     $item;
-      push @items_data, "- ${item_key}_check_status[$key] $st\n";
-    }
-
-    $check_exists{$key} = 1;
   }
 
   return;
