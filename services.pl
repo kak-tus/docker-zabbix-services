@@ -19,13 +19,11 @@ my @nodes;
 my @services;
 my @checks;
 my @services_flow;
-my @checks_flow;
 
 my @items_data;
 
 my %check_exists;
 my %services_count;
-my %final_status_checks_flow;
 
 _dcs();
 
@@ -80,11 +78,6 @@ sub _dcs {
         "- ${item_key}_service_flow_setuped_count[$key] $services_count{$key}{setuped_count}\n";
   }
 
-  foreach my $key ( keys %final_status_checks_flow ) {
-    my $st = $final_status_checks_flow{$key};
-    push @items_data, "- ${item_key}_check_status_flow[$key] $st\n";
-  }
-
   my $val = encode_json( { data => \@dcs } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_dcs $val\n";
 
@@ -99,9 +92,6 @@ sub _dcs {
 
   $val = encode_json( { data => \@checks } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_checks $val\n";
-
-  $val = encode_json( { data => \@checks_flow } );
-  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_checks_flow $val\n";
 
   return;
 }
@@ -134,11 +124,6 @@ sub _services {
   foreach my $service ( values %{ $data->{Services} } ) {
     my $count = _detect_count( $service->{Tags} );
 
-    if ( _is_ignore( $service->{Tags} ) ) {
-      _checks( $dc, $node, $service, $count );
-      next;
-    }
-
     if ($count) {
       my $item = {
         '{#SERVICE_ID}'   => $service->{ID},
@@ -164,14 +149,14 @@ sub _services {
           "- ${item_key}_service_status[$dc,$node->{Node},$service->{ID}] 1\n";
     }
 
-    _checks( $dc, $node, $service, $count );
+    _checks( $dc, $node, $service );
   }
 
   return;
 }
 
 sub _checks {
-  my ( $dc, $node, $service, $count ) = @_;
+  my ( $dc, $node, $service ) = @_;
 
   state %cache;
 
@@ -199,35 +184,12 @@ sub _checks {
       };
 
       my $st = $CHECK_MAP{ $check->{Status} };
-      my $key;
 
-      if ($count) {
-        $key = "$service->{Service},$check->{CheckID}";
+      my $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
+      next if $check_exists{$key};
 
-        unless ( $check_exists{$key} ) {
-          push @checks_flow, $item;
-        }
-
-        unless ( defined $final_status_checks_flow{$key} ) {
-          $final_status_checks_flow{$key} = $st;
-        }
-
-        ## If found passing
-        if ( $st == 0 ) {
-          $final_status_checks_flow{$key} = $st;
-        }
-        ## If found critical
-        elsif ( $final_status_checks_flow{$key} < $st ) {
-          $final_status_checks_flow{$key} = $st;
-        }
-      }
-      else {
-        $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
-        next if $check_exists{$key};
-
-        push @checks,     $item;
-        push @items_data, "- ${item_key}_check_status[$key] $st\n";
-      }
+      push @checks,     $item;
+      push @items_data, "- ${item_key}_check_status[$key] $st\n";
 
       $check_exists{$key} = 1;
     }
@@ -242,16 +204,6 @@ sub _detect_count {
   foreach my $tag (@$tags) {
     next unless index( $tag, 'count-' ) == 0;
     return substr( $tag, 6, length($tag) - 6 );
-  }
-
-  return;
-}
-
-sub _is_ignore {
-  my $tags = shift;
-
-  foreach my $tag (@$tags) {
-    return 1 if $tag eq 'ignore-service';
   }
 
   return;
