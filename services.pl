@@ -25,6 +25,7 @@ my @items_data;
 
 my %check_exists;
 my %services_count;
+my %final_status_checks_flow;
 
 _dcs();
 
@@ -95,6 +96,11 @@ sub _dcs {
         "- ${item_key}_service_flow_count[$key] $services_count{$key}{count}\n";
     push @items_data,
         "- ${item_key}_service_flow_setuped_count[$key] $services_count{$key}{setuped_count}\n";
+  }
+
+  foreach my $key ( keys %final_status_checks_flow ) {
+    my $st = $final_status_checks_flow{$key};
+    push @items_data, "- ${item_key}_check_status_flow[$key] $st\n";
   }
 
   return;
@@ -194,11 +200,24 @@ sub _checks {
     my $key;
 
     if ($count) {
-      $key = "$service->{ID},$check->{CheckID}";
-      next if $check_exists{$key};
+      $key = $service->{Service};
 
-      push @checks_flow, $item;
-      push @items_data,  "- ${item_key}_check_status_flow[$key] $st\n";
+      unless ( $check_exists{$key} ) {
+        push @checks_flow, $item;
+      }
+
+      unless ( defined $final_status_checks_flow{$key} ) {
+        $final_status_checks_flow{$key} = $st;
+      }
+
+      ## If found passing
+      if ( $st == 0 ) {
+        $final_status_checks_flow{$key} = $st;
+      }
+      ## If found critical
+      elsif ( $final_status_checks_flow{$key} < $st ) {
+        $final_status_checks_flow{$key} = $st;
+      }
     }
     else {
       $key = "$dc,$node->{Node},$service->{ID},$check->{CheckID}";
