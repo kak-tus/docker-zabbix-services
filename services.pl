@@ -202,7 +202,7 @@ sub _checks {
       my $key;
 
       if ($count) {
-        $key = $service->{Service};
+        $key = "$service->{Service},$check->{CheckID}";
 
         unless ( $check_exists{$key} ) {
           push @checks_flow, $item;
