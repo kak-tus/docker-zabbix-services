@@ -29,30 +29,12 @@ my %final_status_checks_flow;
 
 _dcs();
 
-my $zabbix = "zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME}";
-
-my $val = encode_json( { data => \@dcs } );
-say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_dcs' -o '$val'`;
-
-$val = encode_json( { data => \@nodes } );
-say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_nodes' -o '$val'`;
-
-$val = encode_json( { data => \@services } );
-say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_services' -o '$val'`;
-
-$val = encode_json( { data => \@services_flow } );
-say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_services_flow' -o '$val'`;
-
-$val = encode_json( { data => \@checks } );
-say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_checks' -o '$val'`;
-
-$val = encode_json( { data => \@checks_flow } );
-say `$zabbix -k '$ENV{SRV_DISCOVERY_KEY}_checks_flow' -o '$val'`;
-
 my ( $fh, $filename ) = tempfile();
 binmode $fh, ':utf8';
 print $fh @items_data;
 close $fh;
+
+my $zabbix = "zabbix_sender -z $ENV{SRV_ZABBIX_SERVER} -s $ENV{SRV_HOSTNAME}";
 
 say `$zabbix -i $filename`;
 
@@ -69,7 +51,7 @@ sub _query {
     last if $resp->is_success;
 
     $try--;
-    sleep 1;
+    sleep 2;
   }
 
   unless ( $resp->is_success ) {
@@ -102,6 +84,24 @@ sub _dcs {
     my $st = $final_status_checks_flow{$key};
     push @items_data, "- ${item_key}_check_status_flow[$key] $st\n";
   }
+
+  my $val = encode_json( { data => \@dcs } );
+  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_dcs $val\n";
+
+  $val = encode_json( { data => \@nodes } );
+  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_nodes $val\n";
+
+  $val = encode_json( { data => \@services } );
+  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_services $val\n";
+
+  $val = encode_json( { data => \@services_flow } );
+  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_services_flow $val\n";
+
+  $val = encode_json( { data => \@checks } );
+  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_checks $val\n";
+
+  $val = encode_json( { data => \@checks_flow } );
+  push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_checks_flow $val\n";
 
   return;
 }
