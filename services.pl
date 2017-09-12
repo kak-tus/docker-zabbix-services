@@ -9,7 +9,7 @@ use JSON qw( encode_json decode_json );
 use LWP::UserAgent;
 use File::Temp qw(tempfile);
 
-my $ua = LWP::UserAgent->new( timeout => 10 );
+my $ua = LWP::UserAgent->new( timeout => 60 );
 my $item_key = $ENV{SRV_ITEM_KEY};
 
 my %CHECK_MAP = ( passing => 0, warning => 1, critical => 2 );
