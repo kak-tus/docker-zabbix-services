@@ -5,7 +5,7 @@ use warnings;
 use v5.10;
 use utf8;
 
-use JSON qw( encode_json decode_json );
+use JSON qw(decode_json);
 use LWP::UserAgent;
 use File::Temp qw(tempfile);
 
@@ -24,6 +24,8 @@ my @items_data;
 
 my %check_exists;
 my %services_count;
+
+my $ENCODER = JSON->new();
 
 _dcs();
 
@@ -78,19 +80,19 @@ sub _dcs {
         "- ${item_key}_service_flow_setuped_count[$key] $services_count{$key}{setuped_count}\n";
   }
 
-  my $val = encode_json( { data => \@dcs } );
+  my $val = $ENCODER->encode( { data => \@dcs } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_dcs $val\n";
 
-  $val = encode_json( { data => \@nodes } );
+  $val = $ENCODER->encode( { data => \@nodes } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_nodes $val\n";
 
-  $val = encode_json( { data => \@services } );
+  $val = $ENCODER->encode( { data => \@services } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_services $val\n";
 
-  $val = encode_json( { data => \@services_flow } );
+  $val = $ENCODER->encode( { data => \@services_flow } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_services_flow $val\n";
 
-  $val = encode_json( { data => \@checks } );
+  $val = $ENCODER->encode( { data => \@checks } );
   push @items_data, "- $ENV{SRV_DISCOVERY_KEY}_checks $val\n";
 
   return;
