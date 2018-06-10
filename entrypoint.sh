@@ -7,3 +7,5 @@ child=$!
 
 trap "kill $child" SIGTERM SIGINT
 wait "$child"
+trap - SIGTERM SIGINT
+wait "$child"
