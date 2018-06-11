@@ -7,11 +7,68 @@ import (
 
 	"github.com/adubkov/go-zabbix"
 	"github.com/hashicorp/consul/api"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var statusMap = map[string]string{
+	"passing":  "0",
+	"warning":  "1",
+	"critical": "2",
+}
 
 type serviceCount struct {
 	count        int
 	setupedCount int
+}
+
+type dcType struct {
+	DC string `json:"{#DC}"`
+}
+
+type dcDataType struct {
+	Data []dcType `json:"data"`
+}
+
+type nodeType struct {
+	DC   string `json:"{#DC}"`
+	Node string `json:"{#NODE}"`
+}
+
+type nodeDataType struct {
+	Data []nodeType `json:"data"`
+}
+
+type serviceType struct {
+	DC          string `json:"{#DC}"`
+	Node        string `json:"{#NODE}"`
+	ServiceID   string `json:"{#SERVICE_ID}"`
+	ServiceName string `json:"{#SERVICE_NAME}"`
+}
+
+type serviceDataType struct {
+	Data []serviceType `json:"data"`
+}
+
+type serviceFlowType struct {
+	ServiceID   string `json:"{#SERVICE_ID}"`
+	ServiceName string `json:"{#SERVICE_NAME}"`
+}
+
+type serviceFlowDataType struct {
+	Data []serviceFlowType `json:"data"`
+}
+
+type checkType struct {
+	DC          string `json:"{#DC}"`
+	Node        string `json:"{#NODE}"`
+	ServiceID   string `json:"{#SERVICE_ID}"`
+	ServiceName string `json:"{#SERVICE_NAME}"`
+	CheckID     string `json:"{#CHECK_ID}"`
+	CheckName   string `json:"{#CHECK_NAME}"`
+}
+
+type checkDataType struct {
+	Data []checkType `json:"data"`
 }
 
 var client *api.Client
@@ -22,18 +79,24 @@ var discoveryKey string
 var itemKey string
 var servicesCount map[string]*serviceCount
 
-var statusMap = map[string]string{
-	"passing":  "0",
-	"warning":  "1",
-	"critical": "2",
-}
-
 var checksCache map[string]api.HealthChecks
 var checkProcessed = map[string]bool{}
+
+var dcData dcDataType
+var nodeData nodeDataType
+var serviceData serviceDataType
+var serviceFlowData serviceFlowDataType
+var checkData checkDataType
 
 func main() {
 	servicesCount = make(map[string]*serviceCount)
 	checksCache = make(map[string]api.HealthChecks)
+
+	dcData.Data = make([]dcType, 0)
+	nodeData.Data = make([]nodeType, 0)
+	serviceData.Data = make([]serviceType, 0)
+	serviceFlowData.Data = make([]serviceFlowType, 0)
+	checkData.Data = make([]checkType, 0)
 
 	var err error
 
@@ -74,9 +137,14 @@ func datacenters() {
 		key := fmt.Sprintf("%s_dc_status[%s]", itemKey, dc)
 		metrics = append(metrics, zabbix.NewMetric(host, key, "1"))
 
+		dcData.Data = append(dcData.Data, dcType{
+			DC: dc,
+		})
+
 		nodes(dc)
 	}
 
+	discovery()
 	flowServices()
 }
 
@@ -92,6 +160,11 @@ func nodes(dc string) {
 	for _, nd := range nds {
 		key := fmt.Sprintf("%s_node_status[%s,%s]", itemKey, nd.Datacenter, nd.Node)
 		metrics = append(metrics, zabbix.NewMetric(host, key, "1"))
+
+		nodeData.Data = append(nodeData.Data, nodeType{
+			DC:   nd.Datacenter,
+			Node: nd.Node,
+		})
 
 		services(nd)
 	}
@@ -119,9 +192,21 @@ func services(nd *api.Node) {
 			}
 
 			servicesCount[srv.Service].count++
+
+			serviceFlowData.Data = append(serviceFlowData.Data, serviceFlowType{
+				ServiceID:   srv.ID,
+				ServiceName: srv.Service,
+			})
 		} else {
 			key := fmt.Sprintf("%s_service_status[%s,%s,%s]", itemKey, nd.Datacenter, nd.Node, srv.ID)
 			metrics = append(metrics, zabbix.NewMetric(host, key, "1"))
+
+			serviceData.Data = append(serviceData.Data, serviceType{
+				DC:          nd.Datacenter,
+				Node:        nd.Node,
+				ServiceID:   srv.ID,
+				ServiceName: srv.Service,
+			})
 		}
 
 		checks(nd, srv)
@@ -160,6 +245,15 @@ func checks(nd *api.Node, srv *api.AgentService) {
 
 		key = fmt.Sprintf("%s_check_status[%s]", itemKey, key)
 		metrics = append(metrics, zabbix.NewMetric(host, key, statusMap[c.Status]))
+
+		checkData.Data = append(checkData.Data, checkType{
+			DC:          nd.Datacenter,
+			Node:        nd.Node,
+			ServiceID:   srv.ID,
+			ServiceName: srv.Service,
+			CheckID:     c.CheckID,
+			CheckName:   c.Name,
+		})
 	}
 }
 
@@ -185,4 +279,46 @@ func flowServices() {
 		key = fmt.Sprintf("%s_service_flow_setuped_count[%s]", itemKey, s)
 		metrics = append(metrics, zabbix.NewMetric(host, key, strconv.Itoa(v.setupedCount)))
 	}
+}
+
+func discovery() {
+	encoded, err := jsoniter.Marshal(dcData)
+	if err != nil {
+		panic(err)
+	}
+
+	key := fmt.Sprintf("%s_dcs", discoveryKey)
+	metrics = append(metrics, zabbix.NewMetric(host, key, string(encoded)))
+
+	encoded, err = jsoniter.Marshal(nodeData)
+	if err != nil {
+		panic(err)
+	}
+
+	key = fmt.Sprintf("%s_nodes", discoveryKey)
+	metrics = append(metrics, zabbix.NewMetric(host, key, string(encoded)))
+
+	encoded, err = jsoniter.Marshal(serviceFlowData)
+	if err != nil {
+		panic(err)
+	}
+
+	key = fmt.Sprintf("%s_services_flow", discoveryKey)
+	metrics = append(metrics, zabbix.NewMetric(host, key, string(encoded)))
+
+	encoded, err = jsoniter.Marshal(serviceData)
+	if err != nil {
+		panic(err)
+	}
+
+	key = fmt.Sprintf("%s_services", discoveryKey)
+	metrics = append(metrics, zabbix.NewMetric(host, key, string(encoded)))
+
+	encoded, err = jsoniter.Marshal(checkData)
+	if err != nil {
+		panic(err)
+	}
+
+	key = fmt.Sprintf("%s_checks", discoveryKey)
+	metrics = append(metrics, zabbix.NewMetric(host, key, string(encoded)))
 }
