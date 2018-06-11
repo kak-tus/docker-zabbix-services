@@ -1,11 +1,11 @@
-FROM alpine:3.7
+FROM golang:1.10-alpine AS build
 
-RUN \
-  apk add --no-cache \
-    perl \
-    perl-json \
-    perl-libwww \
-    zabbix-utils
+WORKDIR /go/src/github.com/kak-tus/docker-zabbix-services
+COPY main.go ./
+COPY vendor ./vendor/
+RUN apk add --no-cache git && go get
+
+FROM alpine:3.7
 
 ENV \
   CONSUL_HTTP_ADDR= \
@@ -17,7 +17,7 @@ ENV \
   SRV_ZABBIX_SERVER= \
   SRV_CHECK_PERIOD=15
 
-COPY services.pl /usr/local/bin/services.pl
+COPY --from=build /go/bin/docker-zabbix-services /usr/local/bin/docker-zabbix-services
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
 CMD ["/usr/local/bin/entrypoint.sh"]

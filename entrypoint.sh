@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-( crontab -l ; echo "*/$SRV_CHECK_PERIOD * * * * /usr/local/bin/services.pl" ) | crontab -
+( crontab -l ; echo "*/$SRV_CHECK_PERIOD * * * * /usr/local/bin/docker-zabbix-services" ) | crontab -
 
 crond -f &
 child=$!
