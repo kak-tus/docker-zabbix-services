@@ -1,14 +1,15 @@
-FROM golang:1.11.2-alpine3.8 AS build
+FROM golang:1.13.2-alpine3.10 AS build
 
-WORKDIR /go/src/github.com/kak-tus/docker-zabbix-services
+WORKDIR /go/docker-zabbix-services
 
-COPY main.go ./
-COPY types.go ./
-COPY vendor ./vendor/
+COPY go.mod .
+COPY go.sum .
+COPY main.go .
+COPY types.go .
 
-RUN go install
+RUN go build -o /go/bin/docker-zabbix-services
 
-FROM alpine:3.8
+FROM alpine:3.10
 
 ENV \
   CONSUL_HTTP_ADDR= \
